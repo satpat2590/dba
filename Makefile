@@ -1,25 +1,30 @@
 CC=gcc
-CFLAGS=-I. -fPIC
-DEPS=sqlite3.h
-OBJ=main.o sqlite3.o 
-LIBS=-ldl -lpthread -lm
+CFLAGS=-I. -I./src -fPIC -Wall -Wextra
+LDFLAGS=-L./lib -ldl -lpthread -lm
 
-main: $(OBJ) libsqlite3.so
-	$(CC) -o $@ $(OBJ) -L. $(LIBS)
-	
-sqlite3.o: sqlite3.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS) -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_FTS5
+# Step 3: Link and create executable
+main: bin/main
 
-%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+bin/main: main.c build/sql.o lib/libsqlite3.so
+	$(CC) $(CFLAGS) -o $@ main.c build/sql.o $(realpath lib/libsqlite3.so) $(LDFLAGS)
 
-%.o: %.cpp $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+# Step 2: Compile SQL source to object file
+sql_obj: build/sql.o
 
-libsqlite3.so: sqlite3.o
-	$(CC) -shared -o $@ $< $(LIBS)
+build/sql.o: src/sql.c src/sql.h
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-.PHONY: clean
+# Step 1: Build SQLite shared object
+sqlite_so: lib/libsqlite3.so
 
+lib/libsqlite3.so: lib/sqlite3.c lib/sqlite3.h
+	$(CC) $(CFLAGS) -shared -o $@ $< -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_FTS5
+
+# Clean up
 clean:
-	rm -f *.o *~ core *~ libsqlite3.so main
+	rm -f lib/libsqlite3.so
+	rm -rf build/*
+	rm -rf bin/*
+
+# Phony targets
+.PHONY: sqlite_so sql_obj main clean
