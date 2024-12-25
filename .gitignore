@@ -6,5 +6,4 @@ sqlite3.o
 build/*
 *.o
 bin/*
-Makefile.txt
-main_example.c
+build/sql.o
