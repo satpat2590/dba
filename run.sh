@@ -1,4 +1,4 @@
 make clean
 make
-
-./main
+clear
+./bin/main

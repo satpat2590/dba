@@ -47,10 +47,18 @@ Extract it and store it in a secure location, preferably in the same location as
 
 ## Run the Application
 
+There are two ways to run this application. The first is the easiest way, in which you simply run the build script I so graciously provided:
+
+```bash
+./run.sh
+```
+
+### Manual Steps
+
 From this very repository, please go ahead and run the following commands:
 
 ```bash
-make main 
+make
 ```
 
 This should perform the following steps...
@@ -74,10 +82,3 @@ Then, you can run the following command to clean up the repository by removing t
 ```bash
 make clean
 ```
-
-This will allow you to re-create the binaries in a fresh build with the new implementation details. 
-
-```bash
-make main
-```
-

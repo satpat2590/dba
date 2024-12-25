@@ -3,3 +3,8 @@ main
 libsqlite3.so
 main.o
 sqlite3.o
+build/*
+*.o
+bin/*
+Makefile.txt
+main_example.c
