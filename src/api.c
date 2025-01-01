@@ -10,7 +10,35 @@
 #include "src/sql.h"
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <lib/cJSON.h>
+#include <../lib/cJSON.h>
+
+
+/*
+    Internal struct to JSON functionality
+*/
+cJSON *tasks_to_json(TaskList *tasklist) {
+    printf("\n[api.c::tasks_to_json()] - Looping through %d rows in TaskList & the capacity is %d\n", tasklist->count, tasklist->capacity);
+    cJSON *json = cJSON_CreateObject();
+    for (int i = 0; i < tasklist->count; i++) {
+        cJSON *task = cJSON_CreateObject();
+
+     // Retrieve the Task ID for the current row
+        int tid = tasklist->tasks[i].id;
+        char s_tid[10];
+        sprintf(s_tid, "%d", tid);
+        
+     // Create the task to add to the response json variable
+        cJSON_AddItemToObject(json, s_tid, task);
+        cJSON_AddNumberToObject(task, "task_id", tasklist->tasks[i].id);
+        cJSON_AddStringToObject(task, "task_name", tasklist->tasks[i].name);
+        cJSON_AddNumberToObject(task, "duration", tasklist->tasks[i].duration);
+        cJSON_AddStringToObject(task, "category", tasklist->tasks[i].category);
+        cJSON_AddNumberToObject(task, "points", tasklist->tasks[i].points);
+        //cJSON_AddNumberToObject(task, "p_tid", tasklist->tasks[i].p_tid);
+    }
+}
+
+
 
 /*
 GET /tasks - Get a list of all of the current tasks you are working on
@@ -18,9 +46,9 @@ GET /tasks - Get a list of all of the current tasks you are working on
 POST /add_task - Add a new task with following body: 
     {
         "name": str
-        "p_taskid": int
+        "duration": int
+        "p_tid": int
         "description": str
-        "days_to_finish": int
     }
 */
 
@@ -34,7 +62,7 @@ POST /add_task - Add a new task with following body:
         2. If POST, what is the request body?
         3. Is the request endpoint valid?
 */
-void handle_request(int client_socket) {
+void handle_request(int client_socket, sqlite3 *db) {
     char buffer[2048] = {0};
     read(client_socket, buffer, sizeof(buffer) - 1);
 
@@ -48,7 +76,7 @@ void handle_request(int client_socket) {
     if (strcmp(method, "GET") == 0) {
      // Handle the /tasks route
         if (strcmp(route, "/tasks") == 0) {
-            route_get_tasks(client_socket);
+            route_get_tasks(client_socket, db);
         } else {
             send_response(client_socket, "404 Not Found", "text/plain", "Route not found");
         }
@@ -59,7 +87,7 @@ void handle_request(int client_socket) {
             char *body = strstr(buffer, "\r\n\r\n");
             if (body) {
                 body += 4; // Skip the "\r\n\r\n"
-                route_add_task(client_socket, body);
+                route_add_task(client_socket, body, db);
             } else {
                 send_response(client_socket, "400 Bad Request", "text/plain", "Missing body");
             }
@@ -74,16 +102,29 @@ void handle_request(int client_socket) {
 }
 
 // Handler for GET /tasks
-void route_get_tasks(int client_socket) {
-    const char *tasks = "[{\"id\": 1, \"title\": \"Example Task\", \"completed\": false}]";
-    send_response(client_socket, "200 OK", "application/json", tasks);
+void route_get_tasks(int client_socket, sqlite3 *db) {
+    const char *errMsg; 
+    TaskList *tasks = get_tasks(db, errMsg);
+
+    printf("\n[api.c::route_get_tasks()] - Retrieved TaskList from SQL command...\n");
+
+    cJSON *json_res = tasks_to_json(tasks);
+
+    const char *json_res_printform = cJSON_PrintUnformatted(json_res);
+
+    send_response(client_socket, "200 OK", "application/json", json_res_printform);
 }
 
 // Handler for POST /add_task
-void route_add_task(int client_socket, const char *body) { 
+void route_add_task(int client_socket, const char *body, sqlite3 *db) { 
+    cJSON *json_request = cJSON_Parse(body);
+    printf("Request POST data: \n", cJSON_Print(json_request));
 
-    printf("Received POST data: %s\n", body);
-    send_response(client_socket, "201 Created", "text/plain", "Task added successfully");
+    cJSON *json_response = cJSON_CreateObject();
+    cJSON_AddStringToObject(json_response, "State", "Horny");
+    cJSON_AddStringToObject(json_response, "Condition", "Freshly Jerked");
+    cJSON_AddNumberToObject(json_response, "Number of Jerks in a Single Day", 12);
+    send_response(client_socket, "201 Created", "application/json", cJSON_PrintUnformatted(json_response));
 }
 
 // Utility function to send an HTTP response

@@ -5,8 +5,8 @@ LDFLAGS=-L./lib -ldl -lpthread -lm
 # Step 3: Link and create executable
 main: bin/main
 
-bin/main: main.c build/sql.o build/api.o lib/libsqlite3.so lib/libcjson.so.1.7.18
-	$(CC) $(CFLAGS) -o $@ main.c build/sql.o build/api.o $(realpath lib/libsqlite3.so) $(realpath lib/libcjson.so.1.7.18) $(LDFLAGS)
+bin/main: main.c build/sql.o build/api.o lib/libsqlite3.so lib/libcjson.so.1
+	$(CC) $(CFLAGS) -o $@ main.c build/sql.o build/api.o $(realpath lib/libsqlite3.so) $(realpath lib/libcjson.so.1) $(LDFLAGS)
 		
 # Step 2: Compile SQL source to object file
 sql_obj: build/sql.o
@@ -23,7 +23,7 @@ sqlite_so: lib/libsqlite3.so
 lib/libsqlite3.so: lib/sqlite3.c lib/sqlite3.h
 	$(CC) $(CFLAGS) -shared -o $@ $< -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_FTS5
 
-lib/libcjson.so.1.7.18:
+lib/libcjson.so.1:
 # No build command here. Could potentially create your own shared object file using cJSON implementation files
 
 # Clean up

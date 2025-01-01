@@ -7,10 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-void handle_request(int client_socket);
+void handle_request(int client_socket, sqlite3* db);
 
-void route_get_tasks(int client_socket);
+void route_get_tasks(int client_socket, sqlite3 *db);
 
-void route_add_task(int client_socket, const char *body);
+void route_add_task(int client_socket, const char *body, sqlite3 *db);
 
 void send_response(int client_socket, const char *status, const char *content_type, const char *body);

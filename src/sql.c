@@ -14,12 +14,29 @@ CATEGORY: The category that this task belongs to
 POINTS: Amount of points, X, that accomplishing task will grant
 */
 typedef struct {
-    int id;
+    int tid;
     char name[100];
     int duration;
     char category[100];
     int points;
+    char directory[200];
+    int p_tid;
 } Task;
+
+/*
+
+CREATE TABLE IF NOT EXISTS TASKS(
+    0 TID INTEGER PRIMARY KEY AUTOINCREMENT, 
+    1 NAME TEXT NOT NULL, 
+    2 DURATION INT,
+    3 CATEGORY CHAR(50),
+    4 POINTS INT NOT NULL,
+    5 DIRECTORY TEXT,
+    6 P_TID INT,
+    FOREIGN KEY (P_TID) REFERENCES TASKS (TID)
+);
+
+*/
 
 /*
 TASKS: Array of Task objects 
@@ -34,7 +51,7 @@ typedef struct {
 
 
 void print_row(Task* row) {
-    printf("\n(%d, %s, %d, %s, %d)", row->id, row->name, row->duration, row->category, row->points);
+    printf("\n(%d, %s, %d, %s, %d)", row->tid, row->name, row->duration, row->category, row->points);
 }
 
 void print_set(TaskList *sql_data) {
@@ -47,34 +64,53 @@ void print_set(TaskList *sql_data) {
     printf("\n");
 }
 
+
 // Runs for each row of output data returned from a SQL query
 int tasks_callback(void *data, int argc, char **argv, char **azColName) {
-    TaskList *result = (TaskList *)data; // Type casting the parameter to be of type ResultantSet 
+    printf("\n[sql.c::tasks_callback()] - Looping through a SELECT query resultant set\n");
+    for (int i = 0; i < argc; i++) {
+        printf("\n%s\n", argv[i]);
+    }
+
+    TaskList *result = (TaskList *)data; // Type casting the parameter to be of type TaskList 
     
  // If the number of elements in the resultant set is greater than or equal to the max capacity, then... 
     if (result->count >= result->capacity) { 
         result->capacity *= 2; // Double our max capacity 
+        printf("\n[sql.c::tasks_callback()] - Number of elements in TaskList is above capacity...\n\n...Increasing capacity by double from %d to %d\n", result->count, result->capacity);
         result->tasks = realloc(result->tasks, result->capacity * sizeof(Task)); // Reallocate memory to account for new capacity
         if (result->tasks == NULL) {
-            fprintf(stderr, "[TASK PROCESSOR] Memory allocation failed for Tasks struct\n");
+            fprintf(stderr, "[sql.c::tasks_callback()] - Memory allocation failed for Tasks struct\n");
             return 1; // Non-zero return in sqlite callback stops the query execution
         }
     }
 
  // Process and store the row in the Row struct
     Task row;
-    // ID 
-    row.id = argv[0] ? atoi(argv[0]) : 0;
+    // TID 
+    printf("\n[sql.c::tasks_callback()] - Adding TID from SQL query to Task struct...\n");
+    row.tid = argv[0] ? atoi(argv[0]) : 0;
     // NAME
+    printf("\n[sql.c::tasks_callback()] - Adding NAME from SQL query to Task struct...\n");
     if (argv[1]) strncpy(row.name, argv[1], sizeof(row.name) - 1), row.name[sizeof(row.name) - 1] = '\0';
     else row.name[0] = '\0';
     // DURATION
+    printf("\n[sql.c::tasks_callback()] - Adding DURATION from SQL query to Task struct...\n");
     row.duration = argv[2] ? atoi(argv[2]) : 0;
     // CATEGORY
+    printf("\n[sql.c::tasks_callback()] - Adding CATEGORY from SQL query to Task struct...\n");
     if (argv[3]) strncpy(row.category, argv[3], sizeof(row.name) - 1), row.name[sizeof(row.name) - 1] = '\0';
     else row.name[0] = '\0';
     // POINTS
+    printf("\n[sql.c::tasks_callback()] - Adding POINTS from SQL query to Task struct...\n");
     row.points = argv[4] ? atoi(argv[4]) : 0;
+    // DIRECTORY
+    printf("\n[sql.c::tasks_callback()] - Adding DIRECTORY from SQL query to Task struct...\n");
+    if (argv[5]) strncpy(row.name, argv[5], sizeof(row.name) - 1), row.name[sizeof(row.name) - 1] = '\0';
+    else row.name[0] = '\0';
+    // P_TID
+    printf("\n[sql.c::tasks_callback()] - Adding P_TID from SQL query to Task struct...\n");
+    row.p_tid = argv[6] ? atoi(argv[6]) : -1;
 
  // Store the completed Task struct as an index in the 'tasks' field of Tasks struct 
     result->tasks[result->count] = row; 
@@ -90,15 +126,95 @@ int callback(void *data, int argc, char **argv, char **azColName) {
 }
 
 TaskList *get_tasks(sqlite3 *db, char **errMsg) { 
-    char *sql = "SELECT * FROM TASKS;";   
-    fprintf(stdout, "\n--------%s--------\n", sql);
+ // Check if the TASKS table exists in the database    
+    sqlite3_stmt *stmt;
+    const char *check_sql = "SELECT name FROM sqlite_master WHERE type='table' AND name='TASKS';";
+    if (sqlite3_prepare_v2(db, check_sql, -1, &stmt, NULL) != SQLITE_OK) {
+        fprintf(stderr, "Error preparing statement: %s\n", sqlite3_errmsg(db));
+        return NULL;
+    }
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        fprintf(stderr, "Error: TASKS table does not exist.\n");
+        sqlite3_finalize(stmt);
+        return NULL;
+    }
+    sqlite3_finalize(stmt);
 
+ // Check if the TASKS table is empty or not  
+    const char *count_sql = "SELECT COUNT(*) FROM TASKS;";
+    int count = 0;
+    sqlite3_prepare_v2(db, count_sql, -1, &stmt, NULL);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        count = sqlite3_column_int(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
+    if (count == 0) {
+        fprintf(stdout, "No entries in TASKS table.\n");
+        return NULL;
+    }
+
+ // If the TASKS table exists and the number of elements in table is above 0, then run SELECT query...
+    const char *sql = "SELECT * FROM TASKS;";   
+    fprintf(stdout, "\n--------%s--------\n", sql);
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL)) {
+        fprintf(stderr, "\n[sql.c::get_tasks()] - Error in creating a prepared statement...\n");
+    }
+
+ // Memory allocation portion
+    printf("\n[sql.c::get_tasks(db, errMsg)] - Entering memory allocation portion...\n");
     TaskList *results = malloc(sizeof(TaskList)); // Creating a struct to store query results
-    results->tasks = malloc(10 * sizeof(Task)); // Initial capacity of the rows stored in the ResultantSet struct
+    if (results == NULL) {
+        fprintf(stderr, "\n[sql.c::get_tasks()] - Memory allocation failed for TaskList\n");
+        return NULL; 
+    }
+
+    results->tasks = malloc(10 * sizeof(Task)); // Initial capacity of the rows stored in the TaskList struct
+    if (results->tasks == NULL) {
+        fprintf(stderr, "\n[sql.c::get_tasks()] - Memory allocation failed for tasks array in TaskList\n");
+    }
+
     results->count = 0; 
-    results->capacity = 10; // How many rows are able to be stored? 
+    results->capacity = 20; // How many rows are able to be stored? 
 
     int rc; 
+    printf("\n[sql.c::get_tasks(db, errMsg)] - ...Executing query: %s\n", sql);
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, 'Failed to prepare statement: %s\n', sqlite3_errmsg(db));
+        free(results->tasks);
+        free(results);
+        return NULL;
+    }
+
+ // Loop through each row of the resultant set
+    while((rc == sqlite3_step(stmt)) == SQLITE_ROW) {
+     // Expand the array if needed
+        if (results->count >= results->capacity) {
+            results->capacity *= 2;
+            results->tasks = realloc(results->tasks, results->capacity * sizeof(Task));
+            if (results->tasks == NULL) {
+                fprintf(stderr, "\n[sql.c::get_tasks()] - Reallocation of results->tasks FAILED...\n");
+                sqlite3_finalize(stmt);
+                free(results->tasks);
+                free(results);
+                return NULL;
+            }
+        }
+     // Populate a new Task object
+        Task *task = &results->tasks[results->count++];
+        
+        task->tid = sqlite3_column_int(stmt, 0);
+
+        //if (argv[1]) strncpy(row.name, argv[1], sizeof(row.name) - 1), row.name[sizeof(row.name) - 1] = '\0';
+        //else row.name[0] = '\0';
+
+        task->duration = sqlite3_column_int(stmt, 2);
+        
+        
+        //task->category = strdup((const char *)sqlite3_column_text(stmt, 3));
+
+
+    }
     rc = sqlite3_exec(db, sql, tasks_callback, results, errMsg);
 
     if (rc != SQLITE_OK) { // FAILURE CASE
@@ -107,11 +223,13 @@ TaskList *get_tasks(sqlite3 *db, char **errMsg) {
 
      // Free everything
         for (int o = 0; o < results->count; o++) { // Free each row
-            free(&results->tasks[o].id);
+            free(&results->tasks[o].tid);
             free(results->tasks[o].name);
             free(&results->tasks[o].duration);
             free(results->tasks[o].category);                                                            
             free(&results->tasks[o].points);
+            free(results->tasks[o].directory);
+            free(&results->tasks[o].p_tid);
         }
         free(results->tasks); // Free the array of Task structs from Tasks struct
         free(results); // Free the Tasks struct
@@ -129,7 +247,7 @@ TaskList *query_tasks(sqlite3 *db, const char *sql, char **errMsg) {
     TaskList *results = malloc(sizeof(TaskList)); // Creating a struct to store query results
     results->tasks = malloc(10 * sizeof(Task)); // Initial capacity of the rows stored in the ResultantSet struct
     results->count = 0; 
-    results->capacity = 10; // How many rows are able to be stored? 
+    results->capacity = 50; // How many rows are able to be stored? 
 
     int rc; 
     rc = sqlite3_exec(db, sql, tasks_callback, results, errMsg);
@@ -139,7 +257,7 @@ TaskList *query_tasks(sqlite3 *db, const char *sql, char **errMsg) {
         sqlite3_free(*errMsg);
      // Free everything
         for (int o = 0; o < results->count; o++) { // Free each row
-            free(&results->tasks[o].id);
+            free(&results->tasks[o].tid);
             free(results->tasks[o].name);
             free(&results->tasks[o].duration);
             free(results->tasks[o].category);
@@ -178,7 +296,7 @@ No two tasks can have the same ID or Names.
 */
 int insert(sqlite3 *db, Task task, char **errMsg) {
     sqlite3_stmt *stmt; 
-    const char *sql = "INSERT INTO TASKS (NAME, DURATION, CATEGORY, POINTS) VALUES (?, ?, ?, ?)";
+    const char *sql = "INSERT INTO TASKS (NAME, DURATION, CATEGORY, POINTS) VALUES (?, ?, ?, ?, ?)";
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) { // FAILURE CASE
         fprintf(stderr, "\n[SQL.C] Failed to Prepare Statement: %s\n", sqlite3_errmsg(db));
@@ -224,7 +342,7 @@ int db_close(sqlite3 *db) {
 }
 
 // Create a new Task object 
-Task create_task(char *name, int duration, char *category, int points) {
+Task create_task(char *name, int duration, char *category, int points, int p_tid) {
     Task new_task;
  // Copy 'name' and 'category' into the const char * attributes of new_task
     strncpy(new_task.name, name, sizeof(new_task.name) - 1), new_task.name[sizeof(new_task.name) - 1] = '\0';
@@ -232,6 +350,11 @@ Task create_task(char *name, int duration, char *category, int points) {
  // Assign duration and points as integers   
     new_task.duration = duration; 
     new_task.points = points;
+    if (p_tid != -1) {
+        new_task.p_tid = p_tid; 
+    } else {
+        new_task.p_tid = -1; 
+    }
 
     return new_task;
 }
