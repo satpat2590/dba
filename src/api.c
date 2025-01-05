@@ -12,7 +12,6 @@
 #include <arpa/inet.h>
 #include <../lib/cJSON.h>
 
-
 /*
     Internal struct to JSON functionality
 */
@@ -36,6 +35,10 @@ cJSON *tasks_to_json(TaskList *tasklist) {
         cJSON_AddNumberToObject(task, "points", tasklist->tasks[i].points);
         //cJSON_AddNumberToObject(task, "p_tid", tasklist->tasks[i].p_tid);
     }
+}
+
+Task json_to_task(cJSON *json) {
+
 }
 
 
@@ -105,6 +108,11 @@ void handle_request(int client_socket, sqlite3 *db) {
 void route_get_tasks(int client_socket, sqlite3 *db) {
     const char *errMsg; 
     TaskList *tasks = get_tasks(db, errMsg);
+    if (tasks == NULL) { // Tasks table is empty...
+        printf("\n[api.c::route_get_tasks()] - tasks is NULL... sending response...\n");
+        send_response(client_socket, "200 OK", "text/plain", "No tasks in the TASKS table.");
+        return; 
+    }
 
     printf("\n[api.c::route_get_tasks()] - Retrieved TaskList from SQL command...\n");
 
@@ -119,6 +127,26 @@ void route_get_tasks(int client_socket, sqlite3 *db) {
 void route_add_task(int client_socket, const char *body, sqlite3 *db) { 
     cJSON *json_request = cJSON_Parse(body);
     printf("Request POST data: \n", cJSON_Print(json_request));
+    if (json_request == NULL) {
+        fprintf(stderr, "\n[api.c:route_add_task()] - Failure to parse json string\n");
+        send_response(client_socket, "400 Bad Request", "text/plain", "Invalid JSON request.");
+        return; 
+    }
+
+    int rc; 
+    Task ntask; 
+    char *errMsg; 
+    rc = create_task_with_json(json_request, &ntask);
+    if (rc < 0) {
+        send_response(client_socket, "400 Bad Request", "text/plain", "Invalid item in JSON.");
+        return;
+    }
+
+    rc = insert(db, ntask, &errMsg);
+    if (rc < 0) {
+        send_response(client_socket, "500 Internal Server Error", "text/plain", "Insert into DB failed.");
+        return;   
+    }
 
     cJSON *json_response = cJSON_CreateObject();
     cJSON_AddStringToObject(json_response, "State", "Horny");

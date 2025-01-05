@@ -6,6 +6,8 @@
 #include <lib/sqlite3.h> 
 #include <stdlib.h>
 #include <string.h>
+#include <../lib/cJSON.h>
+
 
 void handle_request(int client_socket, sqlite3* db);
 

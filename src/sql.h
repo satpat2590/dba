@@ -6,6 +6,7 @@
 #include <lib/sqlite3.h> 
 #include <stdlib.h>
 #include <string.h>
+#include <../lib/cJSON.h>
 
 typedef struct {
     int id;
@@ -36,3 +37,5 @@ int db_open(const char *db_path, sqlite3 **db);
 int db_close(sqlite3 *db);
 
 Task create_task(char *name, int duration, char *category, int points);
+
+int create_task_with_json(cJSON *json, Task *ntask);
