@@ -22,19 +22,22 @@ cJSON *tasks_to_json(TaskList *tasklist) {
         cJSON *task = cJSON_CreateObject();
 
      // Retrieve the Task ID for the current row
-        int tid = tasklist->tasks[i].id;
+        int tid = tasklist->tasks[i].tid;
+        printf("\n[api.c::tasks_to_json()] - Processing TID %d...\n", tid);
         char s_tid[10];
         sprintf(s_tid, "%d", tid);
         
      // Create the task to add to the response json variable
         cJSON_AddItemToObject(json, s_tid, task);
-        cJSON_AddNumberToObject(task, "task_id", tasklist->tasks[i].id);
+        cJSON_AddNumberToObject(task, "task_id", tasklist->tasks[i].tid);
         cJSON_AddStringToObject(task, "task_name", tasklist->tasks[i].name);
         cJSON_AddNumberToObject(task, "duration", tasklist->tasks[i].duration);
         cJSON_AddStringToObject(task, "category", tasklist->tasks[i].category);
         cJSON_AddNumberToObject(task, "points", tasklist->tasks[i].points);
-        //cJSON_AddNumberToObject(task, "p_tid", tasklist->tasks[i].p_tid);
+        cJSON_AddNumberToObject(task, "p_tid", tasklist->tasks[i].p_tid);
     }
+
+    return json;
 }
 
 Task json_to_task(cJSON *json) {
@@ -50,8 +53,10 @@ POST /add_task - Add a new task with following body:
     {
         "name": str
         "duration": int
+        "category": str
+        "points": int
+        "directory": str
         "p_tid": int
-        "description": str
     }
 */
 
@@ -106,7 +111,7 @@ void handle_request(int client_socket, sqlite3 *db) {
 
 // Handler for GET /tasks
 void route_get_tasks(int client_socket, sqlite3 *db) {
-    const char *errMsg; 
+    char *errMsg; 
     TaskList *tasks = get_tasks(db, errMsg);
     if (tasks == NULL) { // Tasks table is empty...
         printf("\n[api.c::route_get_tasks()] - tasks is NULL... sending response...\n");
@@ -116,6 +121,8 @@ void route_get_tasks(int client_socket, sqlite3 *db) {
 
     printf("\n[api.c::route_get_tasks()] - Retrieved TaskList from SQL command...\n");
 
+    print_tasks(tasks);
+    
     cJSON *json_res = tasks_to_json(tasks);
 
     const char *json_res_printform = cJSON_PrintUnformatted(json_res);
@@ -128,7 +135,7 @@ void route_add_task(int client_socket, const char *body, sqlite3 *db) {
     cJSON *json_request = cJSON_Parse(body);
     printf("Request POST data: \n", cJSON_Print(json_request));
     if (json_request == NULL) {
-        fprintf(stderr, "\n[api.c:route_add_task()] - Failure to parse json string\n");
+        fprintf(stderr, "\n[api.c::route_add_task()] - Failure to parse json string\n");
         send_response(client_socket, "400 Bad Request", "text/plain", "Invalid JSON request.");
         return; 
     }

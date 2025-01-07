@@ -43,6 +43,48 @@ Extract it and store it in a secure location, preferably in the same location as
 
 ## Part 2: Set Up Repository
 
+The directory is structured like the following:
+
+sqlite/
+
+- bin/
+    - main
+- build/
+    - *.o
+- lib/
+    - cJSON.h
+    - libcjson.so.1
+    - libsqlite3.so
+    - sqlite3.c
+    - sqlite3.h
+- src/
+    - api.c
+    - api.h
+    - sql.c
+    - sql.h
+- bootup.sql
+- build.sh
+- main.c
+- Makefile
+- README.md
+- run.sh
+- taskm.db
+
+
+Descriptions of each folder/file: 
+
+The bin/ folder holds the main executable program
+The build/ folder contains the intermediary files during program compilation
+The lib/ folder contains shared object files used to link to the compiled object files
+The src/ folder contains the local source code for the application
+The bootup.sql file runs an SQL script which creates the initial state of the database
+The build.sh script runs the bootup.sql file and then ensures that the tables are set up properly
+The main.c file is the main entryway into the application
+The Makefile defines steps to build the main executable
+The README.md is what you're currently reading right now!
+The run.sh script compiles the main program and then runs it 
+The taskm.db database file contains the stored information as defined by bootup.sql
+
 
 
 ## Run the Application

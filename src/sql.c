@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS TASKS(
 /*
 TID: Unique code given to a task
 NAME: The name of the task at hand
-p_tid: The amount of hours X it will take to finish task
+DURATION: The amount of hours X it will take to finish task
 CATEGORY: The category that this task belongs to
 POINTS: Amount of points, X, that accomplishing task will grant
 DIRECTORY: Location where all files pertaining to the task are stored
@@ -36,7 +36,7 @@ P_TID: The parent task's TID
 typedef struct {
     int tid;
     char name[100];
-    int p_tid;
+    int duration;
     char category[100];
     int points;
     char directory[200];
@@ -57,15 +57,15 @@ typedef struct {
 
 
 void print_row(Task* row) {
-    printf("\n(%d, %s, %d, %s, %d)", row->tid, row->name, row->p_tid, row->category, row->points);
+    printf("\n(%d, %s, %d, %s, %d, %s, %d)", row->tid, row->name, row->duration, row->category, row->points, row->directory, row->p_tid);
 }
 
 /*
     Print a TaskList's tasks attribute.
 */
-void print_set(TaskList *tlist) {
-    fprintf(stdout, "\nNumber of elements in sql_data: %d\n", tlist->count);
-    fprintf(stdout, "Capacity of the sql_data struct: %d\n", tlist->capacity);
+void print_tasks(TaskList *tlist) {
+    //fprintf(stdout, "\nNumber of elements in sql_data: %d\n", tlist->count);
+    //fprintf(stdout, "Capacity of the sql_data struct: %d\n", tlist->capacity);
 
     for (int o = 0; o < tlist->count; o++) { // Outer loop on the rows in resultant set
         print_row(&tlist->tasks[o]);
@@ -106,9 +106,9 @@ int tasks_callback(void *data, int argc, char **argv, char **azColName) {
     printf("\n[sql.c::tasks_callback()] - Adding NAME from SQL query to Task struct...\n");
     if (argv[1]) strncpy(row.name, argv[1], sizeof(row.name) - 1), row.name[sizeof(row.name) - 1] = '\0';
     else row.name[0] = '\0';
-    // p_tid
-    printf("\n[sql.c::tasks_callback()] - Adding p_tid from SQL query to Task struct...\n");
-    row.p_tid = argv[2] ? atoi(argv[2]) : 0;
+    // DURATION
+    printf("\n[sql.c::tasks_callback()] - Adding DURATION from SQL query to Task struct...\n");
+    row.duration = argv[2] ? atoi(argv[2]) : 0;
     // CATEGORY
     printf("\n[sql.c::tasks_callback()] - Adding CATEGORY from SQL query to Task struct...\n");
     if (argv[3]) strncpy(row.category, argv[3], sizeof(row.name) - 1), row.name[sizeof(row.name) - 1] = '\0';
@@ -132,6 +132,7 @@ int tasks_callback(void *data, int argc, char **argv, char **azColName) {
     return 0; 
 }
 
+
 /*
     Procedure:
     1. Check if the TASKS table exists in the SQLite database (taskm.db)
@@ -143,6 +144,14 @@ int tasks_callback(void *data, int argc, char **argv, char **azColName) {
         b. For all char-based data types, ensure you free all allocated space
         c. Add Task struct onto TaskList.tasks Task array 
     6. Ensure that TaskList is allocated properly. Print out the memory mapping if possible.
+*/
+
+/*
+    Retrieve all of the current tasks from the TASKS table.
+
+    :param db: A pointer to a sqlite3 struct, used as an interface for database.
+    :param errMsg: The pointer to a character pointer. Used for sqlite3 to store the error upon query execution.
+    :return: A pointer to a TaskList struct. 
 */
 TaskList *get_tasks(sqlite3 *db, char **errMsg) { 
  // Check if the TASKS table exists in the database    
@@ -176,28 +185,26 @@ TaskList *get_tasks(sqlite3 *db, char **errMsg) {
     }
 
  // Memory allocation portion
-    printf("\n[sql.c::get_tasks(db, errMsg)] - Entering memory allocation portion...\n");
     TaskList *results = malloc(sizeof(TaskList)); // Creating a struct to store query results
     if (results == NULL) { // Malloc failure case
         fprintf(stderr, "\n[sql.c::get_tasks()] - Memory allocation failed for TaskList\n");
         return NULL; 
     }
 
-    results->tasks = malloc(10 * sizeof(Task)); // Initial capacity of the rows stored in the TaskList struct
+    results->count = 0; 
+    results->capacity = 20; // How many rows are able to be stored? 
+
+    results->tasks = malloc(results->capacity * sizeof(Task)); // Initial capacity of the rows stored in the TaskList struct
     if (results->tasks == NULL) { // Malloc failure case
         fprintf(stderr, "\n[sql.c::get_tasks()] - Memory allocation failed for tasks array in TaskList\n");
         free(results);
         return NULL;
     }
 
-    results->count = 0; 
-    results->capacity = 20; // How many rows are able to be stored? 
-
  // If the TASKS table exists and the number of elements in table is above 0, then run SELECT query...
     const char *sql = "SELECT * FROM TASKS;";   
-    fprintf(stdout, "\n--------%s--------\n", sql);
+    fprintf(stdout, "\n---------------%s---------------\n", sql);
 
-    printf("\n[sql.c::get_tasks(db, errMsg)] - ...Executing query: %s\n", sql);
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr, '\n[sql.c::get_tasks()] - Failed to prepare statement: %s\n', sqlite3_errmsg(db));
@@ -207,11 +214,11 @@ TaskList *get_tasks(sqlite3 *db, char **errMsg) {
     }
 
  // Loop through each row of the resultant set
-    while((rc == sqlite3_step(stmt)) == SQLITE_ROW) {
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
      // Expand the array if needed
         if (results->count >= results->capacity) {
             results->capacity *= 2;
-            results->tasks = realloc(results->tasks, results->capacity * sizeof(Task));
+            Task *new_tasks = realloc(results->tasks, results->capacity * sizeof(Task));
             if (results->tasks == NULL) {
                 fprintf(stderr, "\n[sql.c::get_tasks()] - Reallocation of results->tasks FAILED...\n");
                 sqlite3_finalize(stmt);
@@ -219,49 +226,58 @@ TaskList *get_tasks(sqlite3 *db, char **errMsg) {
                 free(results);
                 return NULL;
             }
+            results->tasks = new_tasks;
         }
      // Populate a new Task object
         Task *task = &results->tasks[results->count++];
+        memset(task, 0, sizeof(Task)); // Zero out all fields before use
      // Retrieve all numerical data types
         task->tid = sqlite3_column_int(stmt, 0);
-        task->p_tid = sqlite3_column_int(stmt, 2);
+        task->duration = sqlite3_column_int(stmt, 2);
         task->points = sqlite3_column_int(stmt, 4);
-        task->p_tid = sqlite3_column_int(stmt, 6);
+        if (sqlite3_column_type(stmt, 6) == SQLITE_NULL) {
+            task->p_tid = -1;
+        } else {
+            task->p_tid = sqlite3_column_int(stmt, 6);
+        }
 
      // Retrieve all character-based data types
         const char *name = (const char *)sqlite3_column_text(stmt, 1);
         if (name != NULL) {
-            strncpy(task->name, name, sizeof(task->name) - 1);
+            strncpy(task->name, name ? name : "", sizeof(task->name) - 1);
             task->name[sizeof(task->name) - 1] = '\0';
         } else {
             task->name[0] = '\0'; // Handle NULL case
         }
-        free(name);
         
         const char *category = (const char *)sqlite3_column_text(stmt, 3);
         if (category != NULL) {
-            strncpy(task->category, category, sizeof(task->category) - 1);
+            strncpy(task->category, category ? category : "", sizeof(task->category) - 1);
             task->name[sizeof(task->name) - 1] = '\0';
         } else {
             task->name[0] = '\0';
         }
-        free(category);
 
         const char *directory = (const char *)sqlite3_column_text(stmt, 5);
         if (directory != NULL) {
-            strncpy(task->directory, directory, sizeof(task->directory) - 1);
+            strncpy(task->directory, directory ? directory : "", sizeof(task->directory) - 1);
             task->directory[sizeof(task->directory) - 1] = '\0';
         } else {
             task->directory[0] = '\0';
         }
-        free(directory);
-
     }
 
-    sqlite3_finalize(stmt);
-
     if (rc != SQLITE_DONE) { // If query isn't fully executed, then print error message
-        fprintf(stderr, "\n[sql.c::get_tasks()] - Error executing statement: %s\n", sqlite3_errmsg(db));
+        fprintf(stderr, "\n[sql.c::get_tasks()] - rc = %d; Error executing statement: %s\n", rc, sqlite3_errmsg(db));
+        free(results->tasks);
+        free(results);
+        return NULL;
+    }
+
+    rc = sqlite3_finalize(stmt);
+
+    if (rc != SQLITE_OK) { // If the statement isn't fully finalized and cleaned up, then...
+        fprintf(stderr, "\n[sql.c::get_tasks()] - rc = %d; Error finalizing prepared statement %s\n", rc, sqlite3_errmsg(db));
         free(results->tasks);
         free(results);
         return NULL;
@@ -272,6 +288,17 @@ TaskList *get_tasks(sqlite3 *db, char **errMsg) {
 
 
 
+
+/*
+    Not in use. 
+
+    This function will allow users to submit any SELECT query on the TASKS table.
+    
+    :param db: A pointer to a sqlite3 struct, used as an interface for database.
+    :param sql: The SQL query to be executed in the database.
+    :param errMsg: The pointer to a character pointer. Used for sqlite3 to store the error upon query execution.
+    :return: A pointer to a TaskList struct. 
+*/
 TaskList *query_tasks(sqlite3 *db, const char *sql, char **errMsg) {    
     fprintf(stdout, "\n--------%s--------\n", sql);
 
@@ -290,9 +317,11 @@ TaskList *query_tasks(sqlite3 *db, const char *sql, char **errMsg) {
         for (int o = 0; o < results->count; o++) { // Free each row
             free(&results->tasks[o].tid);
             free(results->tasks[o].name);
-            free(&results->tasks[o].p_tid);
+            free(&results->tasks[o].duration);
             free(results->tasks[o].category);
             free(&results->tasks[o].points);
+            free(results->tasks[o].directory);
+            free(&results->tasks[o].p_tid);
         }
         free(results->tasks); // Free the array of Task structs from Tasks struct
         free(results); // Free the Tasks struct
@@ -303,17 +332,6 @@ TaskList *query_tasks(sqlite3 *db, const char *sql, char **errMsg) {
         return results;
     }
 }
-
-CREATE TABLE IF NOT EXISTS TASKS(
-    0 TID INTEGER PRIMARY KEY AUTOINCREMENT, 
-    1 NAME TEXT NOT NULL, 
-    2 p_tid INT,
-    3 CATEGORY CHAR(50),
-    4 POINTS INT NOT NULL,
-    5 DIRECTORY TEXT,
-    6 P_TID INT,
-    FOREIGN KEY (P_TID) REFERENCES TASKS (TID)
-);
 
 
 /*
@@ -354,7 +372,7 @@ int insert(sqlite3 *db, Task task, char **errMsg) {
 
     // Finalize the statement
     sqlite3_finalize(stmt);
-    fprintf(stdout, "\nQuery executed successfully.\n");
+    fprintf(stdout, "\nPOST /add_task - Insert executed successfully...\n");
     return SQLITE_OK;
 }
 
@@ -369,15 +387,17 @@ int db_close(sqlite3 *db) {
 }
 
 // Create a new Task object 
-Task create_task(char *name, int p_tid, char *category, int points, int p_tid) {
+Task create_task(char *name, int duration, char *category, int points, char *directory, int p_tid) {
     Task new_task;
  // Copy 'name' and 'category' into the const char * attributes of new_task
     strncpy(new_task.name, name, sizeof(new_task.name) - 1), new_task.name[sizeof(new_task.name) - 1] = '\0';
     strncpy(new_task.category, category, sizeof(new_task.category) - 1), new_task.category[sizeof(new_task.category) - 1] = '\0';
- // Assign p_tid and points as integers   
+    strncpy(new_task.directory, directory, sizeof(new_task.directory) - 1), new_task.directory[sizeof(new_task.directory) - 1] = '\0';
+ // Assign p_tid and points as integers
+    new_task.duration = duration;   
     new_task.p_tid = p_tid; 
     new_task.points = points;
-    if (p_tid != -1) {
+    if (p_tid > -1) {
         new_task.p_tid = p_tid; 
     } else {
         new_task.p_tid = -1; 
@@ -390,18 +410,11 @@ int create_task_with_json(cJSON *json, Task *ntask) {
 
  // Retrieve all numerical items from JSON
 
-    cJSON *tid = cJSON_GetObjectItemCaseSensitive(json, "tid");
-    if (cJSON_IsNumber(tid)) {
-        ntask->tid = tid->valueint; 
+    cJSON *duration = cJSON_GetObjectItemCaseSensitive(json, "duration");
+    if (cJSON_IsNumber(duration)) {
+        ntask->duration = duration->valueint;
     } else {
-        fprintf(stderr, "\n[sql.c::create_task_with_json()] - TID is not a valid integer. Task creation failed...\n");
-        return -1; 
-    }
-    cJSON *p_tid = cJSON_GetObjectItemCaseSensitive(json, "p_tid");
-    if (cJSON_IsNumber(p_tid)) {
-        ntask->p_tid = p_tid->valueint;
-    } else {
-        fprintf(stderr, "\n[sql.c::create_task_with_json()] - p_tid is not a valid integer. Task creation failed...\n");
+        fprintf(stderr, "\n[sql.c::create_task_with_json()] - Duration is not a valid integer. Task creation failed...\n");
         return -1; 
     }
     cJSON *points = cJSON_GetObjectItemCaseSensitive(json, "points");

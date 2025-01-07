@@ -9,11 +9,13 @@
 #include <../lib/cJSON.h>
 
 typedef struct {
-    int id;
+    int tid;
     char name[100];
     int duration;
     char category[100];
     int points;
+    char directory[200];
+    int p_tid;
 } Task;
 
 typedef struct {
@@ -39,3 +41,7 @@ int db_close(sqlite3 *db);
 Task create_task(char *name, int duration, char *category, int points);
 
 int create_task_with_json(cJSON *json, Task *ntask);
+
+void print_row(Task* row);
+
+void print_tasks(TaskList *tlist);
