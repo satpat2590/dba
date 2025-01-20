@@ -8,3 +8,4 @@ build/*
 *.o
 bin/*
 build/sql.o
+Makefile.txt

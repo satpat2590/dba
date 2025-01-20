@@ -74,22 +74,53 @@ sqlite/
 Descriptions of each folder/file: 
 
 The bin/ folder holds the main executable program
+
 The build/ folder contains the intermediary files during program compilation
+
 The lib/ folder contains shared object files used to link to the compiled object files
+
 The src/ folder contains the local source code for the application
+
 The bootup.sql file runs an SQL script which creates the initial state of the database
+
 The build.sh script runs the bootup.sql file and then ensures that the tables are set up properly
+
 The main.c file is the main entryway into the application
+
 The Makefile defines steps to build the main executable
+
 The README.md is what you're currently reading right now!
+
 The run.sh script compiles the main program and then runs it 
+
 The taskm.db database file contains the stored information as defined by bootup.sql
 
+## Project Details
 
+This project is aimed to be a first stab at trying to visualize the progress that species make based on their day-to-day experiences. It is designed
+to make users reflect on their identity and carve their own path forward. It also aids in helping users develop better habits in their lives in order to 
+lead a more fulfilled life. 
+
+So far, here is the rough outline of the various components that incorporate the backend of this system I liked to call, Identity: 
+
+### Task Manager
+
+The road to being the person you want to be is riddled with informational barriers and lack of experience. In our modern age, we have such
+short term attention spans that we barely find time to focus on idealizing our identities, let alone realizing it. 
+
+To fix this, a task manager is needed. There needs to be a way where you get to perform tasks which lead you to developing abilities across different domains 
 
 ## Run the Application
 
 There are two ways to run this application. The first is the easiest way, in which you simply run the build script I so graciously provided:
+
+This will set up the sqlite database in your local directory.
+
+```bash
+./build.sh
+```
+
+This will compile the main application and then run it.
 
 ```bash
 ./run.sh
@@ -117,7 +148,9 @@ The executable file will be named <b><i>main</i></b>
 This command will run the main application and allow you to essentially manage your task manager. 
 
 Once you're done using the application, and you feel like you want to make some adjustments, then you certainly can! 
+
 Change the main application or any dependencies as needed (without breaking it, of course!) depending on your use case. 
+
 
 Then, you can run the following command to clean up the repository by removing the executable and shared object files. 
 
