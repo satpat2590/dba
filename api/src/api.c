@@ -29,40 +29,21 @@ cJSON *tasks_to_json(TaskList *tasklist) {
         
      // Create the task to add to the response json variable
         cJSON_AddItemToObject(json, s_tid, task);
-        cJSON_AddNumberToObject(task, "task_id", tasklist->tasks[i].tid);
-        cJSON_AddStringToObject(task, "task_name", tasklist->tasks[i].name);
-        cJSON_AddNumberToObject(task, "duration", tasklist->tasks[i].duration);
+        cJSON_AddNumberToObject(task, "tid", tid);
+        cJSON_AddStringToObject(task, "name", tasklist->tasks[i].name);
+        cJSON_AddStringToObject(task, "description", tasklist->tasks[i].description);
+        cJSON_AddNumberToObject(task, "due_date", tasklist->tasks[i].due_date);   
+        cJSON_AddStringToObject(task, "status", tasklist->tasks[i].status);     
         cJSON_AddStringToObject(task, "category", tasklist->tasks[i].category);
         cJSON_AddNumberToObject(task, "points", tasklist->tasks[i].points);
+        cJSON_AddStringToObject(task, "directory", tasklist->tasks[i].directory);
         cJSON_AddNumberToObject(task, "p_tid", tasklist->tasks[i].p_tid);
+        cJSON_AddNumberToObject(task, "created_at", tasklist->tasks[i].created_at);
+
     }
 
     return json;
 }
-
-Task json_to_task(cJSON *json) {
-
-}
-
-
-
-/*
-GET /tasks - Get a list of all of the current tasks you are working on
-
-POST /add_task - Add a new task with following body: 
-    {
-        "name": str
-        "duration": int
-        "category": str
-        "points": int
-        "directory": str
-        "p_tid": int
-    }
-*/
-
-
-
-
 
 /*
     Take in the request and then parse it to understand...
@@ -111,8 +92,7 @@ void handle_request(int client_socket, sqlite3 *db) {
 
 // Handler for GET /tasks
 void route_get_tasks(int client_socket, sqlite3 *db) {
-    char *errMsg; 
-    TaskList *tasks = get_tasks(db, errMsg);
+    TaskList *tasks = get_tasks(db);
     if (tasks == NULL) { // Tasks table is empty...
         printf("\n[api.c::route_get_tasks()] - tasks is NULL... sending response...\n");
         send_response(client_socket, "200 OK", "text/plain", "No tasks in the TASKS table.");
@@ -142,14 +122,17 @@ void route_add_task(int client_socket, const char *body, sqlite3 *db) {
 
     int rc; 
     Task ntask; 
-    char *errMsg; 
     rc = create_task_with_json(json_request, &ntask);
+
+    printf("\n[api.c::route_add_task()] - Printing the task received from client request...\n");
+    print_task(&ntask);
+
     if (rc < 0) {
         send_response(client_socket, "400 Bad Request", "text/plain", "Invalid item in JSON.");
         return;
     }
 
-    rc = insert(db, ntask, &errMsg);
+    rc = insert(db, ntask);
     if (rc < 0) {
         send_response(client_socket, "500 Internal Server Error", "text/plain", "Insert into DB failed.");
         return;   

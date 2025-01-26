@@ -15,22 +15,6 @@
 
 #define PORT 8080
 
-
-/*
-   Print out a basic JSON request example
-
-*/
-cJSON *get_example_request(const char *task_name, int ptask_id, const char *description, const char *repository) {
-    cJSON *json = cJSON_CreateObject();
-    cJSON_AddStringToObject(json, "task_name", "Create the JSON parser functions for REQ/RES");
-    cJSON_AddNumberToObject(json, "ptask_id", 13);
-    cJSON_AddStringToObject(json, "description", "Create modular C files which will handle the parsing and creation of incoming/outbound JSON messages. This will enable our API to be fully bi-directional.");
-    cJSON_AddStringToObject(json, "repository", "/satyafiles/tm/jsonparser/");
-
-    char* json_print = cJSON_Print(json);
-    printf(json_print);
-    return json; 
-}
 /* 
     Return current time in time_t format. 
     Print out time in string format.
@@ -53,25 +37,20 @@ time_t get_currtime() {
 }
 
 
-// Main function
+
 int main() {
  // Program Start
     time_t currtime = get_currtime();
-
- // Sample JSON example output
-    const char *task_name = "Create the JSON parser functions for REQ/RES";
-    const char *description = "Create modular C files which will handle the parsing and creation of incoming/outbound JSON messages. This will enable our API to be fully bi-directional.";
-    get_example_request(task_name, 13, description, "/satyafiles/tm/jsonparser/");
 
  // Open a database connection to pass into your functions. This decreases number of connections overall.
     sqlite3 *db; 
     int rc; 
     rc = sqlite3_open("taskm.db", &db);
     if (rc) {
-      fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+      fprintf(stderr, "\nCan't open database: %s\n", sqlite3_errmsg(db));
       return(0);
     } else {
-      fprintf(stdout, "Opened database successfully\n");
+      fprintf(stdout, "\nOpened database successfully\n");
     }
 
 

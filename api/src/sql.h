@@ -11,12 +11,16 @@
 typedef struct {
     int tid;
     char name[100];
-    int duration;
+    char description[255];
+    int due_date;
+    char status[20];
     char category[100];
     int points;
     char directory[200];
     int p_tid;
+    int created_at;
 } Task;
+
 
 typedef struct {
     Task *tasks;
@@ -26,13 +30,9 @@ typedef struct {
 
 Task create_task(char *name, int duration, char *category, int points);
 
-TaskList *get_tasks(sqlite3 *db, char **errMsg); 
+TaskList *get_tasks(sqlite3 *db); 
 
-TaskList *query_tasks(sqlite3 *db, const char *sql, char **errMsg);
-
-int query(sqlite3 *db, const char *sql, char **errMsg);
-
-int insert(sqlite3 *db, Task task, char **errMsg);
+int insert(sqlite3 *db, Task task);
 
 int db_open(const char *db_path, sqlite3 **db);
 
@@ -42,6 +42,6 @@ Task create_task(char *name, int duration, char *category, int points);
 
 int create_task_with_json(cJSON *json, Task *ntask);
 
-void print_row(Task* row);
+void print_task(Task* row);
 
 void print_tasks(TaskList *tlist);
